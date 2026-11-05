@@ -63,6 +63,13 @@ tasks.register('testMinecraftCompatibility', JavaExec) {
 }
 tasks.named('check') { dependsOn tasks.named('testMinecraftCompatibility') }
 
+// Tests here are executable self-tests, not JUnit/TestNG classes. Gradle 9 otherwise
+// fails discovery before the explicitly registered JavaExec checks can run.
+tasks.named('test') {
+    failOnNoDiscoveredTests = false
+    dependsOn tasks.named('testGeometry'), tasks.named('testPenInput'), tasks.named('testMinecraftCompatibility')
+}
+
 tasks.register('verifyModJar') {
     group = 'verification'
     dependsOn tasks.named('jar')
