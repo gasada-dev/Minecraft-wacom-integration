@@ -12,6 +12,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
+import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec3;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -149,9 +150,11 @@ public final class ArtMapPenClient implements ClientModInitializer {
         double u = config.flipX ? 1.0 - x : x;
         double v = config.flipY ? 1.0 - y : y;
         CanvasAim.Angle look = calibration.aim(u, v);
-        mc.player.setYRot(look.yaw());
+        // Preserve the nearest yaw revolution so render interpolation does not spin 360°.
+        float yaw = mc.player.getYRot() + Mth.wrapDegrees(look.yaw() - mc.player.getYRot());
+        mc.player.setYRot(yaw);
         mc.player.setXRot(look.pitch());
-        mc.player.setYHeadRot(look.yaw());
+        mc.player.setYHeadRot(yaw);
         boolean side1Now = sample.armed() && config.sideButton1Mask != 0
                 && (sample.buttons() & config.sideButton1Mask) != 0;
         boolean side2Now = sample.armed() && config.sideButton2Mask != 0
@@ -243,6 +246,7 @@ public final class ArtMapPenClient implements ClientModInitializer {
             mc.options.keyUse.setDown(false);
             message(mc, "Перо ВКЛ: подними наконечник перед рисованием. F8 выключить, F9 диагностика.");
         } catch (Throwable ex) {
+            pen.close();
             LOGGER.warn("Cannot open tablet", ex);
             message(mc, "Ошибка WinTab: " + ex.getClass().getSimpleName());
         }
