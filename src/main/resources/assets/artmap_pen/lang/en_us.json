@@ -1,0 +1,7 @@
+{
+  "key.category.artmap_pen.controls": "ArtMap Pen Controls",
+  "key.artmap_pen.calibrate": "Capture next canvas corner",
+  "key.artmap_pen.toggle": "Toggle pen drawing mode",
+  "key.artmap_pen.debug": "Show pen status",
+  "key.artmap_pen.flip_y": "Flip tablet Y axis"
+}

@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "artmap_pen",
+  "version": "${version}",
+  "name": "ArtMap Pen Absolute",
+  "description": "Experimental Windows Wintab absolute pen-to-ArtMap view calibration; client-only.",
+  "authors": ["Community prototype"],
+  "contact": {
+    "sources": "https://github.com/gasada-dev/Minecraft-wacom-integration",
+    "issues": "https://github.com/gasada-dev/Minecraft-wacom-integration/issues"
+  },
+  "license": "MIT",
+  "environment": "client",
+  "entrypoints": { "client": ["dev.artmap.pen.ArtMapPenClient"] },
+  "mixins": ["artmap_pen.mixins.json"],
+  "depends": {
+    "minecraft": "26.3",
+    "java": ">=25",
+    "fabricloader": ">=0.20.1",
+    "fabric-api": "*"
+  }
+}

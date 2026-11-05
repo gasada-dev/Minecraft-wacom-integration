@@ -1,0 +1,93 @@
+name: Build and prepare alpha release
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Verify JAR (${{ matrix.os }}, Java 25)
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: Check version tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          expected="v$(sed -n 's/^mod_version=//p' gradle.properties | tr -d '\r')"
+          test "$GITHUB_REF_NAME" = "$expected"
+
+      - name: Compile, test calibration and input, validate Minecraft targets and JAR
+        shell: bash
+        run: ./gradlew --no-daemon --console=plain --stacktrace clean build
+
+      - name: Stage verified distribution
+        shell: bash
+        run: |
+          version="$(sed -n 's/^mod_version=//p' gradle.properties | tr -d '\r')"
+          mkdir -p dist
+          cp "build/libs/artmap-pen-absolute-${version}.jar" dist/
+          cd dist
+          sha256sum *.jar > SHA256SUMS
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: artmap-pen-${{ matrix.os }}
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Save verification reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reports-${{ matrix.os }}
+          path: build/reports/
+          if-no-files-found: ignore
+
+  release:
+    name: Prepare draft prerelease after both builds pass
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: artmap-pen-ubuntu-24.04
+          path: dist
+      - name: Prepare GitHub Release with verified JAR and checksum
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          cd dist
+          sha256sum -c SHA256SUMS
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" ./*.jar SHA256SUMS --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" ./*.jar SHA256SUMS \
+              --verify-tag --draft --prerelease \
+              --title "ArtMap Pen Absolute $GITHUB_REF_NAME" \
+              --notes-file ../RELEASE_NOTES.md
+          fi

@@ -1,0 +1,95 @@
+plugins {
+    id 'net.fabricmc.fabric-loom' version '1.19.3'
+    id 'maven-publish'
+}
+
+version = project.mod_version
+group = project.maven_group
+base { archivesName = project.archives_base_name }
+
+repositories {
+    mavenCentral()
+    maven { url = 'https://maven.fabricmc.net/' }
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+
+    // JNA is packaged inside the Fabric JAR as a nested dependency.
+    implementation "net.java.dev.jna:jna:${project.jna_version}"
+    include "net.java.dev.jna:jna:${project.jna_version}"
+}
+
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(25)
+    withSourcesJar()
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 25
+    options.encoding = 'UTF-8'
+}
+
+processResources {
+    inputs.property 'version', project.version
+    filesMatching('fabric.mod.json') { expand(version: project.version) }
+}
+
+// This standalone test uses no JUnit. Run it on every 'check'/'build' before publishing.
+tasks.register('testGeometry', JavaExec) {
+    group = 'verification'
+    description = 'Run the 4-corner CanvasAim geometry self-test.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'dev.artmap.pen.math.CanvasAimSelfTest'
+}
+tasks.named('check') { dependsOn tasks.named('testGeometry') }
+
+tasks.register('testPenInput', JavaExec) {
+    group = 'verification'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'dev.artmap.pen.input.PenPacketStateSelfTest'
+}
+tasks.named('check') { dependsOn tasks.named('testPenInput') }
+
+tasks.register('testMinecraftCompatibility', JavaExec) {
+    group = 'verification'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'dev.artmap.pen.MinecraftCompatibilitySelfTest'
+}
+tasks.named('check') { dependsOn tasks.named('testMinecraftCompatibility') }
+
+tasks.register('verifyModJar') {
+    group = 'verification'
+    dependsOn tasks.named('jar')
+    doLast {
+        def jarFile = tasks.named('jar').get().archiveFile.get().asFile
+        new java.util.zip.ZipFile(jarFile).withCloseable { zip ->
+            ['fabric.mod.json', 'artmap_pen.mixins.json',
+             'dev/artmap/pen/ArtMapPenClient.class',
+             'dev/artmap/pen/mixin/MouseHandlerMixin.class',
+             "META-INF/jars/jna-${project.jna_version}.jar"].each { entry ->
+                if (zip.getEntry(entry) == null) throw new GradleException("Missing JAR entry: $entry")
+            }
+            def metadata = new groovy.json.JsonSlurper().parse(zip.getInputStream(zip.getEntry('fabric.mod.json')))
+            if (metadata.version != project.version.toString() || metadata.environment != 'client'
+                    || metadata.depends.minecraft != project.minecraft_version)
+                throw new GradleException('Incorrect Fabric metadata')
+            if (!metadata.jars.any { it.file == "META-INF/jars/jna-${project.jna_version}.jar" })
+                throw new GradleException('JNA must be declared as a nested Fabric dependency')
+        }
+        logger.lifecycle("Verified distributable: ${jarFile.name}")
+    }
+}
+tasks.named('check') { dependsOn tasks.named('verifyModJar') }
+
+tasks.withType(AbstractArchiveTask).configureEach {
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+}
+
+jar { from('LICENSE') }

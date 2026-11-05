@@ -1,0 +1,7 @@
+{
+  "key.category.artmap_pen.controls": "ArtMap: графический планшет",
+  "key.artmap_pen.calibrate": "Запомнить очередной угол холста",
+  "key.artmap_pen.toggle": "Включить/выключить рисование пером",
+  "key.artmap_pen.debug": "Показать координаты пера",
+  "key.artmap_pen.flip_y": "Перевернуть координаты Y планшета"
+}
